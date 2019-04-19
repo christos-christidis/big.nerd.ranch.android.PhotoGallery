@@ -1,40 +1,59 @@
 package com.bignerdranch.photogallery;
 
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.TextView;
+import android.widget.ImageView;
 
 import java.util.ArrayList;
 import java.util.List;
 
+// SOS: Read p542 for the reasons we use our own thread instead of AsyncTask.
 public class PhotoGalleryFragment extends Fragment {
+
+    private static final String LOG_TAG = "PhotoGalleryFragment";
 
     private RecyclerView mPhotoRecyclerView;
     private List<GalleryItem> mItems = new ArrayList<>();
+    private ThumbnailDownloader<PhotoHolder> mThumbnailDownloader;
 
     static Fragment newInstance() {
         return new PhotoGalleryFragment();
     }
 
-    // SOS: we retain the fragment for simple task handling (otherwise we'd have to decide what to do
-    // w the task when the fragment is destroyed & recreated). Alternatively, we could store a handle
-    // to the task and call cancel on it in onDestroy; calling cancel(false) will set a flag that can
-    // be checked inside doInBackground w isCancelled() to exit prematurely, whereas cancel(true)
-    // kills the task immediately. Read p520 on how to publish the progress of the task. Also read
-    // p521 for why AsyncTaskLoader is a better choice to AsyncTask (deals w a lot of problems!)
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
         new FetchItemsTask().execute();
+
+        Handler handler = new Handler();    // SOS: this handler is attached to the main thread's looper
+        mThumbnailDownloader = new ThumbnailDownloader<>(handler);
+        mThumbnailDownloader.setListener(new ThumbnailDownloader.Listener<PhotoHolder>() {
+            @Override
+            public void onThumbnailDownloaded(PhotoHolder photoHolder, Bitmap bitmap) {
+                Drawable drawable = new BitmapDrawable(getResources(), bitmap);
+                photoHolder.bind(drawable);
+            }
+        });
+
+        mThumbnailDownloader.start();
+        // SOS: I must call this to obviate a (rare) race condition where I try to use the thread's
+        // handler before it's set. This makes sure that onLooperPrepared is called now.
+        mThumbnailDownloader.getLooper();
+        Log.i(LOG_TAG, "Background thread started");
     }
 
     @Override
@@ -49,11 +68,21 @@ public class PhotoGalleryFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        mThumbnailDownloader.clearQueue();
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        // SOS: I MUST call this otherwise the thread will never die!
+        mThumbnailDownloader.quit();
+        Log.i(LOG_TAG, "Background thread destroyed");
+    }
+
     private void setUpAdapter() {
-        // SOS: check that fragment is attached to activity so that getActivity() != null. Before this
-        // app, we only had fragment methods called by the framework, which meant that there was def
-        // an activity there (no activity = no callbacks). Now however, this method can be called
-        // from our background thread, so we must make sure!!!
         if (isAdded()) {
             mPhotoRecyclerView.setAdapter(new PhotoAdapter(mItems));
         }
@@ -61,15 +90,15 @@ public class PhotoGalleryFragment extends Fragment {
 
     private class PhotoHolder extends RecyclerView.ViewHolder {
 
-        private final TextView mTitleTextView;
+        private final ImageView mImageView;
 
         PhotoHolder(@NonNull View itemView) {
             super(itemView);
-            mTitleTextView = (TextView) itemView;
+            mImageView = itemView.findViewById(R.id.image_view);
         }
 
-        void bind(GalleryItem item) {
-            mTitleTextView.setText(item.toString());
+        void bind(Drawable drawable) {
+            mImageView.setImageDrawable(drawable);
         }
     }
 
@@ -84,14 +113,17 @@ public class PhotoGalleryFragment extends Fragment {
         @NonNull
         @Override
         public PhotoHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
-            TextView textView = new TextView(getActivity());
-            return new PhotoHolder(textView);
+            LayoutInflater inflater = LayoutInflater.from(getActivity());
+            View view = inflater.inflate(R.layout.list_item_gallery, viewGroup, false);
+            return new PhotoHolder(view);
         }
 
         @Override
         public void onBindViewHolder(@NonNull PhotoHolder photoHolder, int position) {
             GalleryItem galleryItem = mGalleryItems.get(position);
-            photoHolder.bind(galleryItem);
+            Drawable placeholder = getResources().getDrawable(R.drawable.tsipras_alexis);
+            photoHolder.bind(placeholder);
+            mThumbnailDownloader.queueThumbnail(photoHolder, galleryItem.getUrl());
         }
 
         @Override

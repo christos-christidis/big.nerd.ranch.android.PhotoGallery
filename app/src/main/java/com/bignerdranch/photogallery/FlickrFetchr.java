@@ -20,10 +20,8 @@ class FlickrFetchr {
     private static final String LOG_TAG = "FlickrFetchr";
     private static final String API_KEY = "63690e79d9a09ef2ab43c7a1350014b3";
 
-    private byte[] getUrlBytes(String urlSpec) throws IOException {
+    byte[] getUrlBytes(String urlSpec) throws IOException {
         URL url = new URL(urlSpec);
-        // SOS: this simply creates a connection obj that points to the specified URL. The actual
-        // connection will be created when we request its input (or output) stream below.
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         try {
@@ -32,7 +30,6 @@ class FlickrFetchr {
                 throw new IOException(connection.getResponseMessage() + ": with " + urlSpec);
             }
 
-            // SOS: copy bytes to this, so we can then convert it to byte-array
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
             int bytesRead;
@@ -89,7 +86,6 @@ class FlickrFetchr {
             item.setId(photo.getString("id"));
             item.setCaption(photo.getString("title"));
 
-            // SOS: url_s will contain the URL of a small version of the photo
             if (!photo.has("url_s")) {
                 continue;
             }

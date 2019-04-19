@@ -3,7 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.bignerdranch.photogallery">
 
-    <!-- SOS: does not need runtime request, cause it' considered as a non-dangerous permission -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
