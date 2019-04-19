@@ -10,13 +10,14 @@ import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.ViewTreeObserver;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class PhotoGalleryFragment extends Fragment {
+public class PhotoGalleryFragment extends Fragment implements ViewTreeObserver.OnGlobalLayoutListener {
 
     private RecyclerView mPhotoRecyclerView;
     private final List<GalleryItem> mItems = new ArrayList<>();
@@ -57,6 +58,8 @@ public class PhotoGalleryFragment extends Fragment {
                 }
             }
         });
+        mPhotoRecyclerView.getViewTreeObserver().addOnGlobalLayoutListener(this);
+
         setUpAdapter();
 
         return view;
@@ -66,6 +69,22 @@ public class PhotoGalleryFragment extends Fragment {
         if (isAdded()) {
             mPhotoRecyclerView.setAdapter(new PhotoAdapter(mItems));
         }
+    }
+
+    @Override
+    public void onGlobalLayout() {
+        final int PHOTO_WIDTH = dpToPixel(100);
+        int gridWidth = mPhotoRecyclerView.getWidth() / PHOTO_WIDTH;
+        GridLayoutManager layoutManager = (GridLayoutManager) mPhotoRecyclerView.getLayoutManager();
+        assert layoutManager != null;
+        layoutManager.setSpanCount(gridWidth);
+    }
+
+    @SuppressWarnings("SameParameterValue")
+    private int dpToPixel(int dp) {
+        assert getContext() != null;
+        float density = getContext().getResources().getDisplayMetrics().density;
+        return Math.round(dp * density);
     }
 
     private class PhotoHolder extends RecyclerView.ViewHolder {
