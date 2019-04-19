@@ -11,6 +11,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,23 +19,26 @@ import java.util.List;
 public class PhotoGalleryFragment extends Fragment {
 
     private RecyclerView mPhotoRecyclerView;
-    private List<GalleryItem> mItems = new ArrayList<>();
+    private final List<GalleryItem> mItems = new ArrayList<>();
+    private boolean mLoading = false;
+    private int mNextPage = 1;
 
     static Fragment newInstance() {
         return new PhotoGalleryFragment();
     }
 
-    // SOS: we retain the fragment for simple task handling (otherwise we'd have to decide what to do
-    // w the task when the fragment is destroyed & recreated). Alternatively, we could store a handle
-    // to the task and call cancel on it in onDestroy; calling cancel(false) will set a flag that can
-    // be checked inside doInBackground w isCancelled() to exit prematurely, whereas cancel(true)
-    // kills the task immediately. Read p520 on how to publish the progress of the task. Also read
-    // p521 for why AsyncTaskLoader is a better choice to AsyncTask (deals w a lot of problems!)
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
-        new FetchItemsTask().execute();
+        loadNewPage();
+    }
+
+    private void loadNewPage() {
+        mLoading = true;
+        Toast.makeText(getActivity(), "Loading page " + mNextPage + "...", Toast.LENGTH_SHORT).show();
+        new FetchItemsTask().execute(mNextPage);
+        mNextPage++;
     }
 
     @Override
@@ -44,16 +48,21 @@ public class PhotoGalleryFragment extends Fragment {
 
         mPhotoRecyclerView = view.findViewById(R.id.photo_recycler_view);
         mPhotoRecyclerView.setLayoutManager(new GridLayoutManager(getActivity(), 3));
+        mPhotoRecyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(@NonNull RecyclerView recyclerView, int newState) {
+                super.onScrollStateChanged(recyclerView, newState);
+                if (newState == RecyclerView.SCROLL_STATE_IDLE && !recyclerView.canScrollVertically(1) && !mLoading) {
+                    loadNewPage();
+                }
+            }
+        });
         setUpAdapter();
 
         return view;
     }
 
     private void setUpAdapter() {
-        // SOS: check that fragment is attached to activity so that getActivity() != null. Before this
-        // app, we only had fragment methods called by the framework, which meant that there was def
-        // an activity there (no activity = no callbacks). Now however, this method can be called
-        // from our background thread, so we must make sure!!!
         if (isAdded()) {
             mPhotoRecyclerView.setAdapter(new PhotoAdapter(mItems));
         }
@@ -100,17 +109,20 @@ public class PhotoGalleryFragment extends Fragment {
         }
     }
 
-    private class FetchItemsTask extends AsyncTask<Void, Void, List<GalleryItem>> {
+    private class FetchItemsTask extends AsyncTask<Integer, Void, List<GalleryItem>> {
 
         @Override
-        protected List<GalleryItem> doInBackground(Void... params) {
-            return new FlickrFetchr().fetchItems();
+        protected List<GalleryItem> doInBackground(Integer... params) {
+            int page = params[0];
+            return new FlickrFetchr().fetchItems(page);
         }
 
         @Override
         protected void onPostExecute(List<GalleryItem> items) {
-            mItems = items;
+            Toast.makeText(getActivity(), "Finished loading...", Toast.LENGTH_SHORT).show();
+            mItems.addAll(items);
             setUpAdapter();
+            mLoading = false;
         }
     }
 }

@@ -22,8 +22,6 @@ class FlickrFetchr {
 
     private byte[] getUrlBytes(String urlSpec) throws IOException {
         URL url = new URL(urlSpec);
-        // SOS: this simply creates a connection obj that points to the specified URL. The actual
-        // connection will be created when we request its input (or output) stream below.
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
 
         try {
@@ -32,7 +30,6 @@ class FlickrFetchr {
                 throw new IOException(connection.getResponseMessage() + ": with " + urlSpec);
             }
 
-            // SOS: copy bytes to this, so we can then convert it to byte-array
             ByteArrayOutputStream out = new ByteArrayOutputStream();
 
             int bytesRead;
@@ -52,13 +49,14 @@ class FlickrFetchr {
         return new String(getUrlBytes(urlSpec));
     }
 
-    List<GalleryItem> fetchItems() {
+    List<GalleryItem> fetchItems(int pageNumber) {
         List<GalleryItem> items = new ArrayList<>();
 
         try {
             String url = Uri.parse("https://api.flickr.com/services/rest/")
                     .buildUpon()
                     .appendQueryParameter("method", "flickr.photos.getRecent")
+                    .appendQueryParameter("page", Integer.toString(pageNumber))
                     .appendQueryParameter("api_key", API_KEY)
                     .appendQueryParameter("format", "json")
                     .appendQueryParameter("nojsoncallback", "1")
@@ -79,8 +77,8 @@ class FlickrFetchr {
 
     private void parseItems(List<GalleryItem> items, JSONObject jsonBody) throws JSONException {
 
-        JSONObject photosObject = jsonBody.getJSONObject("photos");
-        JSONArray photoArray = photosObject.getJSONArray("photo");
+        JSONObject topLevelObject = jsonBody.getJSONObject("photos");
+        JSONArray photoArray = topLevelObject.getJSONArray("photo");
 
         for (int i = 0; i < photoArray.length(); i++) {
             JSONObject photo = photoArray.getJSONObject(i);
@@ -89,7 +87,6 @@ class FlickrFetchr {
             item.setId(photo.getString("id"));
             item.setCaption(photo.getString("title"));
 
-            // SOS: url_s will contain the URL of a small version of the photo
             if (!photo.has("url_s")) {
                 continue;
             }
