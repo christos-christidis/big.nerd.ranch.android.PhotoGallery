@@ -17,10 +17,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
-// SOS: Read p542 for the reasons we use our own thread instead of AsyncTask.
 public class PhotoGalleryFragment extends Fragment {
 
     private static final String LOG_TAG = "PhotoGalleryFragment";
@@ -37,9 +37,9 @@ public class PhotoGalleryFragment extends Fragment {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setRetainInstance(true);
-        new FetchItemsTask().execute();
+        new FetchItemsTask(this).execute();
 
-        Handler handler = new Handler();    // SOS: this handler is attached to the main thread's looper
+        Handler handler = new Handler();
         mThumbnailDownloader = new ThumbnailDownloader<>(handler);
         mThumbnailDownloader.setListener(new ThumbnailDownloader.Listener<PhotoHolder>() {
             @Override
@@ -50,8 +50,6 @@ public class PhotoGalleryFragment extends Fragment {
         });
 
         mThumbnailDownloader.start();
-        // SOS: I must call this to obviate a (rare) race condition where I try to use the thread's
-        // handler before it's set. This makes sure that onLooperPrepared is called now.
         mThumbnailDownloader.getLooper();
         Log.i(LOG_TAG, "Background thread started");
     }
@@ -77,7 +75,6 @@ public class PhotoGalleryFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        // SOS: I MUST call this otherwise the thread will never die!
         mThumbnailDownloader.quit();
         Log.i(LOG_TAG, "Background thread destroyed");
     }
@@ -132,7 +129,13 @@ public class PhotoGalleryFragment extends Fragment {
         }
     }
 
-    private class FetchItemsTask extends AsyncTask<Void, Void, List<GalleryItem>> {
+    private static class FetchItemsTask extends AsyncTask<Void, Void, List<GalleryItem>> {
+
+        private final WeakReference<PhotoGalleryFragment> mFragmentWeakRef;
+
+        private FetchItemsTask(PhotoGalleryFragment fragment) {
+            mFragmentWeakRef = new WeakReference<>(fragment);
+        }
 
         @Override
         protected List<GalleryItem> doInBackground(Void... params) {
@@ -141,8 +144,11 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         protected void onPostExecute(List<GalleryItem> items) {
-            mItems = items;
-            setUpAdapter();
+            PhotoGalleryFragment fragment = mFragmentWeakRef.get();
+            if (fragment != null) {
+                fragment.mItems = items;
+                fragment.setUpAdapter();
+            }
         }
     }
 }

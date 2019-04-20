@@ -6,10 +6,6 @@ class GalleryItem {
     private String mId;
     private String mUrl;
 
-    String getCaption() {
-        return mCaption;
-    }
-
     void setCaption(String caption) {
         mCaption = caption;
     }
@@ -31,6 +27,7 @@ class GalleryItem {
     }
 
     @Override
+    @SuppressWarnings("NullableProblems")
     public String toString() {
         return mCaption;
     }

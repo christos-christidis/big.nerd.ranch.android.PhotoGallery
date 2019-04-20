@@ -6,14 +6,13 @@ import android.graphics.BitmapFactory;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.Message;
+import android.support.v4.util.LruCache;
 import android.util.Log;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-// SOS: Holy shit. The exact same work is done in 4 lines using a 3rd party library called Picasso
-// (see p542). If I want to display GIFs -> Google's Glide or Facebook's Fresco library
 class ThumbnailDownloader<T> extends HandlerThread {
 
     private static final String LOG_TAG = "ThumbnailDownloader";
@@ -21,12 +20,11 @@ class ThumbnailDownloader<T> extends HandlerThread {
 
     private boolean mHasQuit = false;
     private Handler mRequestHandler;
-    // SOS: this is a thread-safe implementation of hash map
-    private ConcurrentMap<T, String> mRequestMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<T, String> mRequestMap = new ConcurrentHashMap<>();
 
-    // SOS: this will hold the main (UI) thread's handler so I can return the bitmap to him. Remember,
-    // only the main thread can update the UI
-    private Handler mMainThreadHandler;
+    private final Handler mMainThreadHandler;
+
+    private final LruCache<String, Bitmap> mCache = new LruCache<>(64);
 
     interface Listener<T> {
         void onThumbnailDownloaded(T target, Bitmap bitmap);
@@ -49,24 +47,22 @@ class ThumbnailDownloader<T> extends HandlerThread {
         return super.quit();
     }
 
-    // SOS: T will be something to identify our messages. The most clever choice is to use the
-    // PhotoHolder on which the resulting image will be placed!
     void queueThumbnail(T target, String url) {
         Log.i(LOG_TAG, "Got a URL: " + url);
-
         if (url == null) {
             mRequestMap.remove(target);
+        } else if (mCache.get(url) != null) {
+            // SOS: if we don't update mRequestMap here, any pending download that was started when
+            // this view-holder was in a previous position will finish and "overwrite" its image on
+            // top of the image I set here. (this was a bug that took me some time to figure out)
+            mRequestMap.remove(target);
+            mListener.onThumbnailDownloaded(target, mCache.get(url));
         } else {
             mRequestMap.put(target, url);
-            // SOS: obtainMessage associates the msg w mRequestHandler. Note that the msg itself does
-            // not contain the url. We'll get the url from the map later when the handler actually
-            // handles the msg, so that we get the newest url associated with this photoholder (remember
-            // that holders are recycled and reused).
             mRequestHandler.obtainMessage(MESSAGE_DOWNLOAD, target).sendToTarget();
         }
     }
 
-    // SOS: called right before the 1st time looper checks the message-queue
     @SuppressLint("HandlerLeak")
     @Override
     protected void onLooperPrepared() {
@@ -76,18 +72,16 @@ class ThumbnailDownloader<T> extends HandlerThread {
                 if (msg.what == MESSAGE_DOWNLOAD) {
                     @SuppressWarnings("unchecked")
                     T target = (T) msg.obj;
-                    Log.i(LOG_TAG, "Got a request for URL: " + mRequestMap.get(target));
                     handleRequest(target);
                 }
             }
         };
     }
 
-    // SOS: if the user rotates the screen, this thread may be hanging on to invalid photoholders.
-    // Bad things will happen when the user clicks again on the new ImageViews.
     void clearQueue() {
         mRequestHandler.removeMessages(MESSAGE_DOWNLOAD);
         mRequestMap.clear();
+        mCache.evictAll();
     }
 
     private void handleRequest(final T target) {
@@ -102,15 +96,14 @@ class ThumbnailDownloader<T> extends HandlerThread {
             mMainThreadHandler.post(new Runnable() {
                 @Override
                 public void run() {
-                    // SOS: by the time this runs on the main thread, recyclerview may have recycled
-                    // the photoholder and requested a different url for it! Moreover, this thread
-                    // may have quit for some reason...
-                    if (!mRequestMap.get(target).equals(url) || mHasQuit) {
+                    String storedUrl = mRequestMap.get(target);
+                    if (storedUrl == null || !storedUrl.equals(url) || mHasQuit) {
                         return;
                     }
 
                     mRequestMap.remove(target);
                     mListener.onThumbnailDownloaded(target, bitmap);
+                    mCache.put(url, bitmap);
                 }
             });
         } catch (IOException e) {
