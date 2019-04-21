@@ -21,6 +21,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -117,6 +118,13 @@ public class PhotoGalleryFragment extends Fragment {
                 searchView.setQuery(query, false);
             }
         });
+
+        MenuItem toggleItem = menu.findItem(R.id.menu_item_toggle_polling);
+        if (PollService.isServiceAlarmOn(getActivity())) {
+            toggleItem.setTitle(R.string.stop_polling);
+        } else {
+            toggleItem.setTitle(R.string.start_polling);
+        }
     }
 
     @Override
@@ -126,6 +134,12 @@ public class PhotoGalleryFragment extends Fragment {
                 QueryPreferences.setStoredQuery(getActivity(), null);
                 updateItems();
                 return true;
+            case R.id.menu_item_toggle_polling:
+                boolean shouldStartAlarm = !PollService.isServiceAlarmOn(getActivity());
+                PollService.setServiceAlarm(getActivity(), shouldStartAlarm);
+                assert getActivity() != null;
+                getActivity().invalidateOptionsMenu();
+                return true;
             default:
                 return super.onOptionsItemSelected(item);
         }
@@ -133,7 +147,7 @@ public class PhotoGalleryFragment extends Fragment {
 
     private void updateItems() {
         String query = QueryPreferences.getStoredQuery(getActivity());
-        new FetchItemsTask(query).execute();
+        new FetchItemsTask(this, query).execute();
     }
 
     private void setUpAdapter() {
@@ -186,11 +200,13 @@ public class PhotoGalleryFragment extends Fragment {
         }
     }
 
-    private class FetchItemsTask extends AsyncTask<Void, Void, List<GalleryItem>> {
+    private static class FetchItemsTask extends AsyncTask<Void, Void, List<GalleryItem>> {
 
+        private final WeakReference<PhotoGalleryFragment> mFragmentWeakRef;
         private final String mQuery;
 
-        FetchItemsTask(String query) {
+        FetchItemsTask(PhotoGalleryFragment fragment, String query) {
+            mFragmentWeakRef = new WeakReference<>(fragment);
             mQuery = query;
         }
 
@@ -205,8 +221,11 @@ public class PhotoGalleryFragment extends Fragment {
 
         @Override
         protected void onPostExecute(List<GalleryItem> items) {
-            mItems = items;
-            setUpAdapter();
+            PhotoGalleryFragment fragment = mFragmentWeakRef.get();
+            if (fragment != null) {
+                fragment.mItems = items;
+                fragment.setUpAdapter();
+            }
         }
     }
 }

@@ -10,6 +10,7 @@ abstract class SingleFragmentActivity extends AppCompatActivity {
 
     abstract Fragment createFragment();
 
+    @SuppressWarnings("SameReturnValue")
     @LayoutRes
     private int getLayoutResId() {
         return R.layout.activity_single_fragment;

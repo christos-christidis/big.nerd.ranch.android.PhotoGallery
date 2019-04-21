@@ -30,6 +30,7 @@ class GalleryItem {
         mUrl = url;
     }
 
+    @SuppressWarnings("NullableProblems")
     @Override
     public String toString() {
         return mCaption;
