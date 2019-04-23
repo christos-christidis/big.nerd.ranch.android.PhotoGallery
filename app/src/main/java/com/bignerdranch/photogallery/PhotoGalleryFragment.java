@@ -1,5 +1,6 @@
 package com.bignerdranch.photogallery;
 
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -54,7 +55,7 @@ public class PhotoGalleryFragment extends VisibleFragment {
             @Override
             public void onThumbnailDownloaded(PhotoHolder photoHolder, Bitmap bitmap) {
                 Drawable drawable = new BitmapDrawable(getResources(), bitmap);
-                photoHolder.bind(drawable);
+                photoHolder.bindDrawable(drawable);
             }
         });
 
@@ -156,17 +157,29 @@ public class PhotoGalleryFragment extends VisibleFragment {
         }
     }
 
-    private class PhotoHolder extends RecyclerView.ViewHolder {
+    private class PhotoHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
 
         private final ImageView mImageView;
+        private GalleryItem mGalleryItem;
 
         PhotoHolder(@NonNull View itemView) {
             super(itemView);
             mImageView = itemView.findViewById(R.id.image_view);
+            itemView.setOnClickListener(this);
         }
 
-        void bind(Drawable drawable) {
+        void bindDrawable(Drawable drawable) {
             mImageView.setImageDrawable(drawable);
+        }
+
+        void bindGalleryItem(GalleryItem galleryItem) {
+            mGalleryItem = galleryItem;
+        }
+
+        @Override
+        public void onClick(View v) {
+            Intent intent = PhotoPageActivity.newIntent(getActivity(), mGalleryItem.getPhotoPageUri());
+            startActivity(intent);
         }
     }
 
@@ -189,8 +202,9 @@ public class PhotoGalleryFragment extends VisibleFragment {
         @Override
         public void onBindViewHolder(@NonNull PhotoHolder photoHolder, int position) {
             GalleryItem galleryItem = mGalleryItems.get(position);
+            photoHolder.bindGalleryItem(galleryItem);
             Drawable placeholder = getResources().getDrawable(R.drawable.tsipras_alexis);
-            photoHolder.bind(placeholder);
+            photoHolder.bindDrawable(placeholder);
             mThumbnailDownloader.queueThumbnail(photoHolder, galleryItem.getUrl());
         }
 

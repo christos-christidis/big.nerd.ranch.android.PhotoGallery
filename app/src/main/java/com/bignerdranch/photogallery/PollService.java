@@ -91,16 +91,11 @@ public class PollService extends IntentService {
         QueryPreferences.setLastResultId(this, resultId);
     }
 
-    // SOS: broadcasts sent with sendBroadcast are received by all the receivers in undefined order.
-    // If we want a specific receive order, we must use sendOrderedBroadcast. Here, the general idea
-    // is that we'll send the broadcast to NotificationReceiver, but first it may be received by the
-    // "dynamic" receiver mOnShowNotification (read notes in VisibleFragment).
     private void sendNotification() {
         Notification notification = buildNotification();
 
         Intent broadcastIntent = new Intent(ACTION_SHOW_NOTIFICATION);
         broadcastIntent.putExtra(EXTRA_NOTIFICATION_CODE, 0);
-        // SOS: Notification implements Parcelable so I can pass it as extra
         broadcastIntent.putExtra(EXTRA_NOTIFICATION, notification);
         sendOrderedBroadcast(broadcastIntent, PERM_PRIVATE, null, null,
                 Activity.RESULT_OK, null, null);

@@ -3,9 +3,6 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="com.bignerdranch.photogallery">
 
-    <!-- SOS: we define this permission to use it w our broadcasts in PollService, so that only those
-    receivers w this permission, ie ours, receive the broadcast. Note that we must still declare that
-    this app uses this permission below -->
     <permission
         android:name="com.bignerdranch.photogallery.PRIVATE"
         android:protectionLevel="signature" />
@@ -31,6 +28,12 @@
             </intent-filter>
         </activity>
 
+        <!-- SOS: making the activity handle configChanges like here should be avoided, because now
+        I have to load any qualifier-based resources (images, layouts etc) programmatically! -->
+        <activity
+            android:name=".PhotoPageActivity"
+            android:configChanges="keyboardHidden|orientation|screenSize" />
+
         <service android:name=".PollService" />
 
         <receiver android:name=".StartupReceiver">
@@ -39,7 +42,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- SOS: I give this the lowest possible priority so that it receives the broadcast last -->
         <receiver
             android:name=".NotificationReceiver"
             android:exported="false">

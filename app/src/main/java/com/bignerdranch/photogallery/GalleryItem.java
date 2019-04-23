@@ -1,10 +1,14 @@
 package com.bignerdranch.photogallery;
 
+import android.net.Uri;
+
 class GalleryItem {
 
     private String mCaption;
     private String mId;
     private String mUrl;
+
+    private String mOwner;
 
     String getCaption() {
         return mCaption;
@@ -28,6 +32,22 @@ class GalleryItem {
 
     void setUrl(String url) {
         mUrl = url;
+    }
+
+    public String getOwner() {
+        return mOwner;
+    }
+
+    public void setOwner(String owner) {
+        mOwner = owner;
+    }
+
+    Uri getPhotoPageUri() {
+        return Uri.parse("https://www.flickr.com/photos/")
+                .buildUpon()
+                .appendPath(mOwner)
+                .appendPath(mId)
+                .build();
     }
 
     @SuppressWarnings("NullableProblems")
