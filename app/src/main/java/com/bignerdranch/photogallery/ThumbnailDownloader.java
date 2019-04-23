@@ -89,7 +89,7 @@ class ThumbnailDownloader<T> extends HandlerThread {
                 @Override
                 public void run() {
                     String storedUrl = mRequestMap.get(target);
-                    if ((storedUrl != null && !storedUrl.equals(url)) || mHasQuit) {
+                    if (storedUrl == null || !storedUrl.equals(url) || mHasQuit) {
                         return;
                     }
 

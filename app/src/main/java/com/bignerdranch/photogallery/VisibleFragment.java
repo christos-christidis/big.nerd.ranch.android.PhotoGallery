@@ -17,8 +17,6 @@ abstract class VisibleFragment extends Fragment {
         super.onStart();
         IntentFilter filter = new IntentFilter(PollService.ACTION_SHOW_NOTIFICATION);
         assert getActivity() != null;
-        // SOS: note that we have to specify the permission for this receiver, unlike receivers
-        // declared in the manifest which implicitly use the permission that the app uses
         getActivity().registerReceiver(mOnShowNotification, filter, PollService.PERM_PRIVATE, null);
     }
 
@@ -29,9 +27,6 @@ abstract class VisibleFragment extends Fragment {
         getActivity().unregisterReceiver(mOnShowNotification);
     }
 
-    // SOS: This receiver will only be registered when the app is visible, therefore in those cases it
-    // will receive the broadcast before NotificationManager and it will set the result to CANCELLED.
-    // NotificationReceiver will see this result and not send the notification.
     private final BroadcastReceiver mOnShowNotification = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
